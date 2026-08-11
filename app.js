@@ -284,8 +284,16 @@ function bpGenerate() {
     return;
   }
   let html = "";
+  const tips = [];
   if (!autoresponders.length) {
-    html += `<p class="output-empty" style="margin-bottom:12px;">Tip: check an autoresponder too so bridges name the exact destination app.</p>`;
+    tips.push("check an autoresponder too so bridges name the exact destination app");
+  }
+  const triggerCategoriesUsed = [sources.length > 0, commerce.length > 0, team.length > 0].filter(Boolean).length;
+  if (triggerCategoriesUsed <= 1) {
+    tips.push("check a few more apps across Lead sources, Commerce &amp; payments, and Team alerts for a fuller build order");
+  }
+  if (tips.length) {
+    html += `<p class="output-empty" style="margin-bottom:12px;">Tip: ${tips.join(", and ")}.</p>`;
   }
   html += bridges
     .map(
