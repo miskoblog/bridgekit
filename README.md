@@ -1,2 +1,2 @@
-# clientflow
+# bridgekit
 WP Sync Bonus App
