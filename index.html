@@ -135,6 +135,9 @@
       <h1>BridgeBlueprint</h1>
       <p>Tell us your business type and which apps you run — get back a ranked, plain-English build order for WP Sync.</p>
     </div>
+    <div class="tool-intro">
+      <p><strong>What this does:</strong> turns "which bridge should I build first?" into a ranked list, tailored to your business type and the apps you already run. <strong>Why it matters for WP Sync:</strong> building in this order means the first thing you automate is whatever is currently costing you the most time or the most missed revenue — not just whichever integration happened to come to mind first.</p>
+    </div>
     <div class="workspace">
       <div class="form-card">
         <div class="field">
@@ -156,10 +159,19 @@
       <div class="output-card">
         <div class="output-head">
           <span class="output-label">Your build order</span>
-          <button class="ghost-btn" id="bpCopy" type="button">Copy</button>
+          <div class="output-actions">
+            <button class="ghost-btn" id="bpSave" type="button">Save</button>
+            <button class="ghost-btn" id="bpCopy" type="button">Copy</button>
+          </div>
         </div>
         <div id="bpOutput" class="output-body"><p class="output-empty">Pick your business type and apps, then generate.</p></div>
       </div>
+    </div>
+    <div class="saved-card">
+      <div class="saved-head">
+        <span class="output-label">Saved build orders</span>
+      </div>
+      <div id="bpSavedList" class="saved-list"></div>
     </div>
   </section>
 
@@ -168,6 +180,9 @@
     <div class="panel-head">
       <h1>FollowUp Forge</h1>
       <p>The follow-up sequence WP Sync doesn't write for you — Day 2, Day 5, and Day 14, ready to paste into your autoresponder.</p>
+    </div>
+    <div class="tool-intro">
+      <p><strong>What this does:</strong> writes a three-email sequence using PAS (Problem — Agitate — Solution), a proven direct-response copywriting structure: Day 2 names the problem, Day 5 makes the cost of waiting concrete, Day 14 closes with the solution and a reason to act now. <strong>Why it matters for WP Sync:</strong> the bridge gets the lead into your autoresponder the instant it happens — this is what that lead actually reads once they're there, so the automation you built has copy behind it built to convert, not just show up.</p>
     </div>
     <div class="workspace">
       <div class="form-card">
@@ -199,10 +214,19 @@
       <div class="output-card">
         <div class="output-head">
           <span class="output-label">Your follow-up sequence</span>
-          <button class="ghost-btn" id="ffCopy" type="button">Copy</button>
+          <div class="output-actions">
+            <button class="ghost-btn" id="ffSave" type="button">Save</button>
+            <button class="ghost-btn" id="ffCopy" type="button">Copy</button>
+          </div>
         </div>
         <div id="ffOutput" class="output-body"><p class="output-empty">Fill in the offer details, then generate.</p></div>
       </div>
+    </div>
+    <div class="saved-card">
+      <div class="saved-head">
+        <span class="output-label">Saved sequences</span>
+      </div>
+      <div id="ffSavedList" class="saved-list"></div>
     </div>
   </section>
 
@@ -211,6 +235,9 @@
     <div class="panel-head">
       <h1>LeakCalc</h1>
       <p>What manual follow-up (or no automation at all) is actually costing you, in your own numbers.</p>
+    </div>
+    <div class="tool-intro">
+      <p><strong>What this does:</strong> turns your own lead volume, drop-off rate, and subscriber value into a concrete yearly figure — plus a side-by-side of what a recurring automation tool costs over 5 years versus WP Sync's one-time price. <strong>Why it matters for WP Sync:</strong> it's easy to feel like "I'll get to that bridge eventually" — LeakCalc tells you exactly what eventually is costing you, in dollars, so you know which bridge is actually worth building today.</p>
     </div>
     <div class="workspace">
       <div class="form-card">
@@ -235,10 +262,19 @@
       <div class="output-card">
         <div class="output-head">
           <span class="output-label">Your numbers</span>
-          <button class="ghost-btn" id="lcCopy" type="button">Copy</button>
+          <div class="output-actions">
+            <button class="ghost-btn" id="lcSave" type="button">Save</button>
+            <button class="ghost-btn" id="lcCopy" type="button">Copy</button>
+          </div>
         </div>
         <div id="lcOutput" class="output-body"><p class="output-empty">Enter your numbers, then calculate.</p></div>
       </div>
+    </div>
+    <div class="saved-card">
+      <div class="saved-head">
+        <span class="output-label">Saved calculations</span>
+      </div>
+      <div id="lcSavedList" class="saved-list"></div>
     </div>
   </section>
 

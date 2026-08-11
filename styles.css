@@ -72,6 +72,13 @@ button { font-family: inherit; }
 .workspace { display: grid; grid-template-columns: minmax(260px, 340px) 1fr; gap: 20px; align-items: start; }
 @media (max-width: 800px) { .workspace { grid-template-columns: 1fr; } }
 
+.tool-intro {
+  max-width: 720px; background: var(--accent-soft); border-radius: var(--radius);
+  padding: 14px 18px; margin-bottom: 20px;
+}
+.tool-intro p { font-size: 13px; line-height: 1.6; margin: 0; color: var(--ink); }
+.tool-intro strong { color: var(--accent); }
+
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 
 /* ---------- topbar / brand / theme toggle ---------- */
@@ -174,6 +181,7 @@ button { font-family: inherit; }
 
 .output-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
 .output-label { font-size: 12.5px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-soft); }
+.output-actions { display: flex; gap: 8px; }
 .ghost-btn {
   border: 1px solid var(--line-strong); background: transparent; color: var(--ink);
   padding: 7px 13px; border-radius: 7px; font-size: 12.5px; font-weight: 600; cursor: pointer;
@@ -191,6 +199,28 @@ button { font-family: inherit; }
   background: var(--accent-soft); border: 1px solid var(--accent); border-radius: 8px;
   color: var(--ink); font-size: 13.5px; line-height: 1.55; margin: 0; padding: 12px 14px;
 }
+
+/* ---------- saved searches ---------- */
+.saved-card {
+  background: var(--bg-raised); border: 1px solid var(--line); border-radius: var(--radius);
+  box-shadow: var(--shadow); padding: 20px; margin-top: 20px;
+}
+.saved-head { margin-bottom: 12px; }
+.saved-list { display: flex; flex-direction: column; gap: 8px; }
+.saved-item {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  border: 1px solid var(--line); border-radius: 8px; padding: 10px 12px; background: var(--bg);
+}
+.saved-item-info { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.saved-item-name { font-weight: 700; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.saved-item-meta { font-size: 11.5px; color: var(--ink-soft); }
+.saved-item-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.mini-btn {
+  border: 1px solid var(--line-strong); background: transparent; color: var(--ink);
+  padding: 5px 11px; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer;
+}
+.mini-btn:hover { border-color: var(--accent); color: var(--accent); }
+.mini-btn.danger:hover { border-color: #c0392b; color: #c0392b; }
 
 /* ---------- check groups (BridgeBlueprint) ---------- */
 .check-groups { display: flex; flex-direction: column; gap: 10px; }

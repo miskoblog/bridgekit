@@ -100,6 +100,64 @@ function copyElementText(el, label) {
 }
 
 /* ============================================================
+   Saved searches (shared across all three tools)
+   ============================================================ */
+function loadSavedList(key) {
+  try {
+    const raw = localStorage.getItem(key);
+    const list = raw ? JSON.parse(raw) : [];
+    return Array.isArray(list) ? list : [];
+  } catch (e) {
+    return [];
+  }
+}
+
+function persistSavedList(key, list) {
+  localStorage.setItem(key, JSON.stringify(list));
+}
+
+function formatSavedDate(ts) {
+  const d = new Date(ts);
+  return (
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) +
+    " " +
+    d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" })
+  );
+}
+
+function renderSavedList(containerId, list, emptyMessage, metaFor) {
+  const container = document.getElementById(containerId);
+  if (!list.length) {
+    container.innerHTML = `<p class="output-empty">${emptyMessage}</p>`;
+    return;
+  }
+  container.innerHTML = list
+    .map(
+      (item) => `<div class="saved-item" data-id="${item.id}">
+        <div class="saved-item-info">
+          <span class="saved-item-name">${escapeHtml(item.name)}</span>
+          <span class="saved-item-meta">${escapeHtml(metaFor(item))} · ${escapeHtml(formatSavedDate(item.savedAt))}</span>
+        </div>
+        <div class="saved-item-actions">
+          <button class="mini-btn" data-action="open" type="button">Open</button>
+          <button class="mini-btn danger" data-action="delete" type="button">Delete</button>
+        </div>
+      </div>`
+    )
+    .join("");
+}
+
+function wireSavedListActions(containerId, onOpen, onDelete) {
+  document.getElementById(containerId).addEventListener("click", (e) => {
+    const btn = e.target.closest("button[data-action]");
+    if (!btn) return;
+    const id = btn.closest(".saved-item").dataset.id;
+    if (btn.dataset.action === "open") onOpen(id);
+    else if (btn.dataset.action === "delete") onDelete(id);
+  });
+}
+
+/* ============================================================
    TOOL 1 — BridgeBlueprint
    ============================================================ */
 const BP_AUTORESPONDERS = [
@@ -312,90 +370,191 @@ function bpGenerate() {
   );
 }
 
+function bpApplyState(state) {
+  document.getElementById("bpBusinessType").value = state.businessType || "list-builder";
+  document.querySelectorAll("#bpAppChecks input[type=checkbox]").forEach((el) => {
+    el.checked = false;
+  });
+  ["ar", "src", "com", "team"].forEach((prefix, idx) => {
+    const arr = [state.autoresponders, state.sources, state.commerce, state.team][idx] || [];
+    arr.forEach((v) => {
+      const el = document.querySelector(`#bpAppChecks input[data-group="${prefix}"][value="${v}"]`);
+      if (el) el.checked = true;
+    });
+  });
+}
+
 function bpRestore() {
   const raw = localStorage.getItem("bridgekit_bp_state");
   if (!raw) return;
   try {
-    const state = JSON.parse(raw);
-    document.getElementById("bpBusinessType").value = state.businessType || "list-builder";
-    ["ar", "src", "com", "team"].forEach((prefix, idx) => {
-      const arr = [state.autoresponders, state.sources, state.commerce, state.team][idx] || [];
-      arr.forEach((v) => {
-        const el = document.querySelector(`#bpAppChecks input[data-group="${prefix}"][value="${v}"]`);
-        if (el) el.checked = true;
-      });
-    });
+    bpApplyState(JSON.parse(raw));
   } catch (e) {
     /* ignore malformed saved state */
   }
 }
 
+const BP_SAVED_KEY = "bridgekit_bp_saved";
+
+function bpBusinessTypeLabel(value) {
+  const opt = document.querySelector(`#bpBusinessType option[value="${value}"]`);
+  return opt ? opt.textContent : value;
+}
+
+function bpRenderSavedList() {
+  const list = loadSavedList(BP_SAVED_KEY);
+  renderSavedList(
+    "bpSavedList",
+    list,
+    "Nothing saved yet — generate a build order, then click Save to keep it here.",
+    (item) => bpBusinessTypeLabel(item.businessType)
+  );
+}
+
+function bpSaveCurrent() {
+  const out = document.getElementById("bpOutput");
+  if (!out.querySelector(".bridge-item")) {
+    showToast("Generate a build order first");
+    return;
+  }
+  const businessType = document.getElementById("bpBusinessType").value;
+  const defaultName = bpBusinessTypeLabel(businessType) + " build order";
+  const name = window.prompt("Name this build order:", defaultName);
+  if (!name) return;
+  const list = loadSavedList(BP_SAVED_KEY);
+  list.unshift({
+    id: String(Date.now()),
+    name: name.trim().slice(0, 60) || defaultName,
+    savedAt: Date.now(),
+    businessType,
+    autoresponders: bpGetChecked("ar"),
+    sources: bpGetChecked("src"),
+    commerce: bpGetChecked("com"),
+    team: bpGetChecked("team"),
+  });
+  persistSavedList(BP_SAVED_KEY, list);
+  bpRenderSavedList();
+  showToast("Build order saved");
+}
+
+function bpOpenSaved(id) {
+  const item = loadSavedList(BP_SAVED_KEY).find((i) => i.id === id);
+  if (!item) return;
+  bpApplyState(item);
+  bpGenerate();
+  showToast(`Loaded "${item.name}"`);
+}
+
+function bpDeleteSaved(id) {
+  persistSavedList(BP_SAVED_KEY, loadSavedList(BP_SAVED_KEY).filter((i) => i.id !== id));
+  bpRenderSavedList();
+}
+
 function initBridgeBlueprint() {
   bpRenderChecklist();
   bpRestore();
+  bpRenderSavedList();
   document.getElementById("bpGenerate").addEventListener("click", bpGenerate);
   document.getElementById("bpCopy").addEventListener("click", () => copyElementText(document.getElementById("bpOutput"), "Build order"));
+  document.getElementById("bpSave").addEventListener("click", bpSaveCurrent);
+  wireSavedListActions("bpSavedList", bpOpenSaved, bpDeleteSaved);
 }
 
 /* ============================================================
    TOOL 2 — FollowUp Forge
    ============================================================ */
+/* Three-email sequence built on PAS (Problem — Agitate — Solution),
+   a proven direct-response structure: Day 2 names the problem, Day 5
+   agitates the cost of leaving it unsolved, Day 14 closes with the
+   solution and a reason to act now. */
 const FF_TEMPLATES = {
   direct: [
     {
-      day: "Day 2",
-      subject: "Quick follow-up on {offer}",
+      day: "Day 2 · Problem",
+      subject: "{offer} — {angle}",
       body:
         "Hey {first_name},\n\n" +
-        "Wanted to make sure this didn't slip past you: {offer} is live, and it's a fit if you're dealing with what most people on this list deal with — {angle}.\n\n" +
-        "It's {price}, and here's the link if you haven't looked yet:\n{link}\n\n" +
-        "Talk soon,\n[YOUR NAME]",
-    },
-    {
-      day: "Day 5",
-      subject: "In case you missed it — {offer}",
-      body:
-        "Hey {first_name},\n\n" +
-        "A few people asked what makes {offer} worth a look, so here's the short version: {angle}.\n\n" +
-        "Still {price}, still available here:\n{link}\n\n" +
-        "If you've already grabbed it, ignore this — just didn't want you to miss it if not.\n\n" +
+        "Let's be blunt: {offer} {angle}. If that's something you actually need, every day you put off fixing it is leads and revenue quietly leaking out of your business. The longer it sits, the more it costs.\n\n" +
+        "Here's the fix, in plain terms:\n" +
+        "- No extra monthly bill — {price}, paid once.\n" +
+        "- Setup takes minutes, not a weekend project.\n" +
+        "- Works with the tools you already use — nothing to migrate, nothing new to learn.\n\n" +
+        "{offer} is {price}, one time:\n{link}\n\n" +
+        "Grab it before it's back on your \"someday\" list.\n\n" +
         "[YOUR NAME]",
     },
     {
-      day: "Day 14",
-      subject: "Last call: {offer}",
+      day: "Day 5 · Agitate",
+      subject: "Still putting this off?",
       body:
         "Hey {first_name},\n\n" +
-        "Closing the loop on {offer}. If {angle} is something you still need solved, this is your reminder before it's off my radar for new mentions.\n\n" +
-        "{price}, here:\n{link}\n\n" +
+        "Following up on {offer}, because this usually gets worse before it gets better.\n\n" +
+        "Every week you wait is another week of manual work, missed follow-ups, or money handed to a tool you don't need — while {offer} sits there, ready to fix it: {angle}. It adds up fast; most people don't notice until they tally twelve months of it.\n\n" +
+        "{offer} exists specifically to close that gap:\n" +
+        "- Live the same day you set it up.\n" +
+        "- One-time {price} instead of a recurring subscription.\n" +
+        "- Built to work quietly in the background — you won't think about it again.\n\n" +
+        "Here's the link if you're ready to stop the leak:\n{link}\n\n" +
+        "[YOUR NAME]",
+    },
+    {
+      day: "Day 14 · Solution",
+      subject: "Closing this out — {offer}",
+      body:
+        "Hey {first_name},\n\n" +
+        "Last note on {offer}, then I'll leave it alone.\n\n" +
+        "If you still haven't dealt with this, nothing changes until you change it — that's the honest version. {offer} {angle}, at {price}, one time, no ongoing cost.\n\n" +
+        "Quick recap of what you get:\n" +
+        "- {offer} {angle} — permanently, not patched.\n" +
+        "- No new monthly line item on your books.\n" +
+        "- A five-minute setup standing between you and this being done.\n\n" +
+        "Here's the link one more time:\n{link}\n\n" +
+        "P.S. This is the last time {offer} shows up in your inbox from me — if this is worth fixing, now's the moment.\n\n" +
         "[YOUR NAME]",
     },
   ],
   story: [
     {
-      day: "Day 2",
+      day: "Day 2 · Problem",
       subject: "Why I almost skipped {offer}",
       body:
         "Hey {first_name},\n\n" +
-        "Honestly, when I first saw {offer} I almost scrolled past it. Then I actually looked at what it does — {angle} — and that changed things.\n\n" +
-        "It's {price}. Worth two minutes of your time here:\n{link}\n\n" +
+        "I'll be honest — when I first ran into {offer}, I almost scrolled past it. I already had a workaround for the problem it solves, so it didn't feel urgent.\n\n" +
+        "Then I actually sat down and did the math on what \"almost fine\" was costing me. {offer} {angle}, and that's not a minor annoyance — it was quietly draining time and money every single week, just slowly enough that I never noticed the total.\n\n" +
+        "That's the part that changed my mind. {offer} doesn't patch the problem, it removes it:\n" +
+        "- One payment of {price}, no subscription creeping back every month.\n" +
+        "- Live in minutes, not another project for \"someday.\"\n" +
+        "- Nothing to migrate, nothing new to learn.\n\n" +
+        "If any of this sounds familiar, here's where I found it:\n{link}\n\n" +
         "[YOUR NAME]",
     },
     {
-      day: "Day 5",
-      subject: "What changed my mind about {offer}",
+      day: "Day 5 · Agitate",
+      subject: "What finally made me deal with it",
       body:
         "Hey {first_name},\n\n" +
-        "Following up on {offer} — the thing that actually got me was how directly it deals with {angle}. Not a nice-to-have, an actual fix.\n\n" +
-        "Still {price} if you want to see for yourself:\n{link}\n\n" +
+        "Quick follow-up on {offer}, because I think the real story here isn't the tool — it's what waiting costs.\n\n" +
+        "I let this sit unresolved for months because it never felt like \"today's problem.\" Then I tallied up what those months actually cost — in lost time, in leads that slipped through, in a subscription I kept paying \"just in case.\" It was more than I expected, by a lot.\n\n" +
+        "{offer} is what finally closed that gap for me — it {angle}, and it did it without becoming one more thing I had to manage:\n" +
+        "- {price}, paid once — not another line item forever.\n" +
+        "- Genuinely simple enough that I had it running the same afternoon.\n" +
+        "- Works with what I was already using, no rebuild required.\n\n" +
+        "Here's the link, in case this is still sitting on your list too:\n{link}\n\n" +
         "[YOUR NAME]",
     },
     {
-      day: "Day 14",
-      subject: "One more thing about {offer}",
+      day: "Day 14 · Solution",
+      subject: "Last thing I'll say about {offer}",
       body:
         "Hey {first_name},\n\n" +
-        "Last time I'll bring up {offer}. If {angle} is still on your plate unsolved, this is the easiest way I know to fix it — {price}, one link:\n{link}\n\n" +
+        "This is the last time I'll bring up {offer} — after this it's back to regular emails.\n\n" +
+        "If this is still unsolved on your end, I get it, there's always something more urgent. But nothing about that changes until something actually changes it. {offer} was the thing that changed it for me — it {angle} — and it's still {price}, one time.\n\n" +
+        "What you're actually getting:\n" +
+        "- {offer} {angle}, for good.\n" +
+        "- No new monthly cost added to your stack.\n" +
+        "- A setup that takes less time than reading this email did.\n\n" +
+        "Here's the link one more time:\n{link}\n\n" +
+        "P.S. I'm not going to keep mentioning this one — if this has been sitting on your list, this is the natural stopping point to finally deal with it.\n\n" +
         "[YOUR NAME]",
     },
   ],
@@ -433,27 +592,83 @@ function ffGenerate() {
   localStorage.setItem("bridgekit_ff_state", JSON.stringify({ offer, price, angle, link, tone }));
 }
 
+function ffApplyState(s) {
+  document.getElementById("ffOffer").value = s.offer || "";
+  document.getElementById("ffPrice").value = s.price || "";
+  document.getElementById("ffAngle").value = s.angle || "";
+  document.getElementById("ffLink").value = s.link || "";
+  const tone = s.tone || "direct";
+  document.querySelectorAll("#ffTone .seg-btn").forEach((b) => {
+    b.classList.toggle("is-active", b.dataset.tone === tone);
+  });
+}
+
 function ffRestore() {
   const raw = localStorage.getItem("bridgekit_ff_state");
   if (!raw) return;
   try {
-    const s = JSON.parse(raw);
-    document.getElementById("ffOffer").value = s.offer || "";
-    document.getElementById("ffPrice").value = s.price || "";
-    document.getElementById("ffAngle").value = s.angle || "";
-    document.getElementById("ffLink").value = s.link || "";
-    if (s.tone) {
-      document.querySelectorAll("#ffTone .seg-btn").forEach((b) => {
-        b.classList.toggle("is-active", b.dataset.tone === s.tone);
-      });
-    }
+    ffApplyState(JSON.parse(raw));
   } catch (e) {
     /* ignore malformed saved state */
   }
 }
 
+const FF_SAVED_KEY = "bridgekit_ff_saved";
+const FF_TONE_LABEL = { direct: "Direct", story: "Story-driven" };
+
+function ffRenderSavedList() {
+  const list = loadSavedList(FF_SAVED_KEY);
+  renderSavedList(
+    "ffSavedList",
+    list,
+    "Nothing saved yet — generate a sequence, then click Save to keep it here.",
+    (item) => FF_TONE_LABEL[item.tone] || item.tone
+  );
+}
+
+function ffSaveCurrent() {
+  const out = document.getElementById("ffOutput");
+  if (!out.querySelector(".email-block")) {
+    showToast("Generate a sequence first");
+    return;
+  }
+  const offer = document.getElementById("ffOffer").value.trim();
+  const tone = document.querySelector("#ffTone .seg-btn.is-active").dataset.tone;
+  const defaultName = offer + " (" + FF_TONE_LABEL[tone] + ")";
+  const name = window.prompt("Name this sequence:", defaultName);
+  if (!name) return;
+  const list = loadSavedList(FF_SAVED_KEY);
+  list.unshift({
+    id: String(Date.now()),
+    name: name.trim().slice(0, 60) || defaultName,
+    savedAt: Date.now(),
+    offer,
+    price: document.getElementById("ffPrice").value.trim(),
+    angle: document.getElementById("ffAngle").value.trim(),
+    link: document.getElementById("ffLink").value.trim(),
+    tone,
+  });
+  persistSavedList(FF_SAVED_KEY, list);
+  ffRenderSavedList();
+  showToast("Sequence saved");
+}
+
+function ffOpenSaved(id) {
+  const item = loadSavedList(FF_SAVED_KEY).find((i) => i.id === id);
+  if (!item) return;
+  ffApplyState(item);
+  ffGenerate();
+  showToast(`Loaded "${item.name}"`);
+}
+
+function ffDeleteSaved(id) {
+  persistSavedList(FF_SAVED_KEY, loadSavedList(FF_SAVED_KEY).filter((i) => i.id !== id));
+  ffRenderSavedList();
+}
+
 function initFollowUpForge() {
   ffRestore();
+  ffRenderSavedList();
   document.querySelectorAll("#ffTone .seg-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
       document.querySelectorAll("#ffTone .seg-btn").forEach((b) => b.classList.remove("is-active"));
@@ -462,6 +677,8 @@ function initFollowUpForge() {
   });
   document.getElementById("ffGenerate").addEventListener("click", ffGenerate);
   document.getElementById("ffCopy").addEventListener("click", () => copyElementText(document.getElementById("ffOutput"), "Sequence"));
+  document.getElementById("ffSave").addEventListener("click", ffSaveCurrent);
+  wireSavedListActions("ffSavedList", ffOpenSaved, ffDeleteSaved);
 }
 
 /* ============================================================
@@ -522,24 +739,80 @@ function lcCalculate() {
   localStorage.setItem("bridgekit_lc_state", JSON.stringify({ leads, dropoff, value, zapierCost }));
 }
 
+function lcApplyState(s) {
+  if (s.leads) document.getElementById("lcLeads").value = s.leads;
+  if (s.dropoff) document.getElementById("lcDropoff").value = s.dropoff;
+  if (s.value) document.getElementById("lcValue").value = s.value;
+  if (s.zapierCost) document.getElementById("lcZapierCost").value = s.zapierCost;
+}
+
 function lcRestore() {
   const raw = localStorage.getItem("bridgekit_lc_state");
   if (!raw) return;
   try {
-    const s = JSON.parse(raw);
-    if (s.leads) document.getElementById("lcLeads").value = s.leads;
-    if (s.dropoff) document.getElementById("lcDropoff").value = s.dropoff;
-    if (s.value) document.getElementById("lcValue").value = s.value;
-    if (s.zapierCost) document.getElementById("lcZapierCost").value = s.zapierCost;
+    lcApplyState(JSON.parse(raw));
   } catch (e) {
     /* ignore malformed saved state */
   }
 }
 
+const LC_SAVED_KEY = "bridgekit_lc_saved";
+
+function lcRenderSavedList() {
+  const list = loadSavedList(LC_SAVED_KEY);
+  renderSavedList(
+    "lcSavedList",
+    list,
+    "Nothing saved yet — run a calculation, then click Save to keep it here.",
+    (item) => `${item.leads} leads/mo`
+  );
+}
+
+function lcSaveCurrent() {
+  const out = document.getElementById("lcOutput");
+  if (!out.querySelector(".stat-tile")) {
+    showToast("Run a calculation first");
+    return;
+  }
+  const leads = document.getElementById("lcLeads").value.trim();
+  const defaultName = leads + " leads/mo scenario";
+  const name = window.prompt("Name this calculation:", defaultName);
+  if (!name) return;
+  const list = loadSavedList(LC_SAVED_KEY);
+  list.unshift({
+    id: String(Date.now()),
+    name: name.trim().slice(0, 60) || defaultName,
+    savedAt: Date.now(),
+    leads,
+    dropoff: document.getElementById("lcDropoff").value.trim(),
+    value: document.getElementById("lcValue").value.trim(),
+    zapierCost: document.getElementById("lcZapierCost").value.trim(),
+  });
+  persistSavedList(LC_SAVED_KEY, list);
+  lcRenderSavedList();
+  showToast("Calculation saved");
+}
+
+function lcOpenSaved(id) {
+  const item = loadSavedList(LC_SAVED_KEY).find((i) => i.id === id);
+  if (!item) return;
+  lcApplyState(item);
+  lcCalculate();
+  showToast(`Loaded "${item.name}"`);
+}
+
+function lcDeleteSaved(id) {
+  persistSavedList(LC_SAVED_KEY, loadSavedList(LC_SAVED_KEY).filter((i) => i.id !== id));
+  lcRenderSavedList();
+}
+
 function initLeakCalc() {
   lcRestore();
+  lcRenderSavedList();
   document.getElementById("lcCalculate").addEventListener("click", lcCalculate);
   document.getElementById("lcCopy").addEventListener("click", () => copyElementText(document.getElementById("lcOutput"), "Numbers"));
+  document.getElementById("lcSave").addEventListener("click", lcSaveCurrent);
+  wireSavedListActions("lcSavedList", lcOpenSaved, lcDeleteSaved);
 }
 
 /* ============================================================
