@@ -280,7 +280,7 @@ function bpGenerate() {
 
   const out = document.getElementById("bpOutput");
   if (!bridges.length) {
-    out.innerHTML = `<p class="output-empty">Check at least one app above, then generate.</p>`;
+    out.innerHTML = `<p class="output-warning">Autoresponders alone don't generate bridges — they're the destination. Check at least one app under <strong>Lead sources</strong>, <strong>Commerce &amp; payments</strong>, or <strong>Team alerts</strong>, then generate again.</p>`;
     return;
   }
   let html = "";
